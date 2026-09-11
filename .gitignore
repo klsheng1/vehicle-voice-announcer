@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+checkpoints/
+assets/voices/*.wav
+docs/_drafts/
+.ipynb_checkpoints/
+*.egg-info/
+.venv/
+venv/
+.DS_Store

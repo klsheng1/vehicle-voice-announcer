@@ -1,0 +1,4 @@
+# Core (light) dependencies — the demo runs fully offline with these.
+pyttsx3>=2.90          # Windows SAPI5 fallback TTS engine
+matplotlib>=3.7        # only needed for `python -m announcer.cli plot`
+numpy>=1.24

@@ -73,12 +73,17 @@ class BaseScenario:
 
 
 class BusScenario(BaseScenario):
-    """A city bus route: 5 stops, ~9 km, dwell time at every stop."""
+    """A city bus route: 5 demo stops by default, or any real GTFS stop list."""
 
     kind = ScenarioKind.BUS
     line = "Demo Line 1"
     destination_zh = "科技园站"
     destination_en = "Tech Park"
+
+    DWELL_SECONDS = 15
+    CRUISE_MIN, CRUISE_MAX = 11.0, 14.5        # m/s  (~40 - 52 km/h)
+    SPEED_LIMIT = 50                            # km/h
+    OVERSPEED_SEGMENT = (4500, 7000)            # meters where bus slightly exceeds limit
 
     STOPS = [
         Stop("火车站", "Railway Station", 0),
@@ -88,10 +93,25 @@ class BusScenario(BaseScenario):
         Stop("科技园站", "Tech Park", 8600),
     ]
 
-    DWELL_SECONDS = 15
-    CRUISE_MIN, CRUISE_MAX = 11.0, 14.5        # m/s  (~40 - 52 km/h)
-    SPEED_LIMIT = 50                            # km/h on the highway segment
-    OVERSPEED_SEGMENT = (4500, 7000)            # meters where bus slightly exceeds limit
+    def __init__(self, seed: int | None = 42, stops: list[Stop] | None = None,
+                 line: str | None = None, destination_zh: str | None = None,
+                 destination_en: str | None = None, dwell: int = 15,
+                 speed_limit: int = 50):
+        """``stops`` allows injecting a real GTFS stop sequence (see gtfs.py)."""
+        super().__init__(seed)
+        if stops:
+            self.STOPS = stops
+        if line:
+            self.line = line
+        if destination_zh:
+            self.destination_zh = destination_zh
+        if destination_en:
+            self.destination_en = destination_en
+        self.DWELL_SECONDS = dwell
+        self.SPEED_LIMIT = speed_limit
+        total = self.STOPS[-1].distance
+        # put the speeding episode roughly in the middle third of the route
+        self.OVERSPEED_SEGMENT = (int(total * 0.45), int(total * 0.70))
 
     def run(self) -> TripResult:
         rng = self.rng
@@ -139,16 +159,21 @@ class BusScenario(BaseScenario):
             # -- event rules ----------------------------------------
             speed_kmh = self._kmh(v)
 
-            if (not left_turn_done and 2800 <= pos <= 2850 and v > 3):
+            # proportional landmarks so any route length works (GTFS or demo)
+            turn_at = stops[-1].distance * 0.35
+            congestion_at = stops[-1].distance * 0.55
+            brake_at = stops[-1].distance * 0.65
+
+            if (not left_turn_done and turn_at <= pos <= turn_at + 50 and v > 3):
                 result.events.append(Event(EventKind.TURN_LEFT, t=t, speed=speed_kmh))
                 left_turn_done = True
 
-            if (not congestion_done and 4600 <= pos <= 4700 and v > 3):
+            if (not congestion_done and congestion_at <= pos <= congestion_at + 60 and v > 3):
                 result.events.append(Event(EventKind.CONGESTION, t=t, speed=speed_kmh,
                                            params={"delay": rng.randint(5, 12)}))
                 congestion_done = True
 
-            if (not brake_done and 5300 <= pos <= 5400 and v > 5):
+            if (not brake_done and brake_at <= pos <= brake_at + 60 and v > 5):
                 # a pedestrian crosses: hard braking for 2 seconds
                 result.events.append(Event(EventKind.HARSH_BRAKE, t=t, speed=speed_kmh))
                 brake_done = True

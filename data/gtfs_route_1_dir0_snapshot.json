@@ -1,0 +1,229 @@
+{
+ "route": {
+  "feed_path": "data\\mbta_gtfs.zip",
+  "route_id": "1",
+  "route_name": "Harvard Square - Nubian Station",
+  "route_type": "3",
+  "direction_id": "0",
+  "trip_id": "76314031",
+  "headsign": "Harvard"
+ },
+ "stops": [
+  {
+   "stop_id": "64",
+   "name": "Nubian",
+   "lat": 42.329789,
+   "lon": -71.083887,
+   "distance_m": 0.0,
+   "arrival_time": "04:37:00",
+   "stop_sequence": 1
+  },
+  {
+   "stop_id": "1",
+   "name": "Washington St opp Ruggles St",
+   "lat": 42.330957,
+   "lon": -71.082754,
+   "distance_m": 159.8,
+   "arrival_time": "04:37:00",
+   "stop_sequence": 2
+  },
+  {
+   "stop_id": "2",
+   "name": "Washington St @ Melnea Cass Blvd",
+   "lat": 42.332324,
+   "lon": -71.081252,
+   "distance_m": 355.6,
+   "arrival_time": "04:38:00",
+   "stop_sequence": 3
+  },
+  {
+   "stop_id": "6",
+   "name": "Melnea Cass Blvd @ Harrison Ave",
+   "lat": 42.332016,
+   "lon": -71.079576,
+   "distance_m": 497.6,
+   "arrival_time": "04:39:00",
+   "stop_sequence": 4
+  },
+  {
+   "stop_id": "10003",
+   "name": "Albany St opp Randall St",
+   "lat": 42.331591,
+   "lon": -71.076237,
+   "distance_m": 776.1,
+   "arrival_time": "04:40:00",
+   "stop_sequence": 5
+  },
+  {
+   "stop_id": "57",
+   "name": "Massachusetts Ave @ Albany St",
+   "lat": 42.333825,
+   "lon": -71.073541,
+   "distance_m": 1109.0,
+   "arrival_time": "04:41:00",
+   "stop_sequence": 6
+  },
+  {
+   "stop_id": "58",
+   "name": "Massachusetts Ave @ Harrison Ave",
+   "lat": 42.334948,
+   "lon": -71.074931,
+   "distance_m": 1278.3,
+   "arrival_time": "04:42:00",
+   "stop_sequence": 7
+  },
+  {
+   "stop_id": "10590",
+   "name": "Massachusetts Ave @ Washington St",
+   "lat": 42.336876,
+   "lon": -71.07724,
+   "distance_m": 1564.6,
+   "arrival_time": "04:43:00",
+   "stop_sequence": 8
+  },
+  {
+   "stop_id": "87",
+   "name": "Massachusetts Ave @ Tremont St",
+   "lat": 42.339459,
+   "lon": -71.080362,
+   "distance_m": 1949.7,
+   "arrival_time": "04:45:00",
+   "stop_sequence": 9
+  },
+  {
+   "stop_id": "188",
+   "name": "Massachusetts Ave @ Massachusetts Ave Station",
+   "lat": 42.34157,
+   "lon": -71.083092,
+   "distance_m": 2274.5,
+   "arrival_time": "04:47:00",
+   "stop_sequence": 10
+  },
+  {
+   "stop_id": "89",
+   "name": "Massachusetts Ave @ St Botolph St",
+   "lat": 42.342303,
+   "lon": -71.084121,
+   "distance_m": 2391.9,
+   "arrival_time": "04:47:00",
+   "stop_sequence": 11
+  },
+  {
+   "stop_id": "91",
+   "name": "Massachusetts Ave @ Clearway St",
+   "lat": 42.345331,
+   "lon": -71.086739,
+   "distance_m": 2791.5,
+   "arrival_time": "04:49:00",
+   "stop_sequence": 12
+  },
+  {
+   "stop_id": "93",
+   "name": "Massachusetts Ave @ Newbury St",
+   "lat": 42.348005,
+   "lon": -71.088033,
+   "distance_m": 3107.3,
+   "arrival_time": "04:50:00",
+   "stop_sequence": 13
+  },
+  {
+   "stop_id": "95",
+   "name": "Massachusetts Ave @ Beacon St",
+   "lat": 42.350773,
+   "lon": -71.089334,
+   "distance_m": 3433.1,
+   "arrival_time": "04:51:00",
+   "stop_sequence": 14
+  },
+  {
+   "stop_id": "97",
+   "name": "77 Massachusetts Ave",
+   "lat": 42.359349,
+   "lon": -71.093716,
+   "distance_m": 4452.4,
+   "arrival_time": "04:54:00",
+   "stop_sequence": 15
+  },
+  {
+   "stop_id": "99",
+   "name": "Massachusetts Ave @ Albany St",
+   "lat": 42.360758,
+   "lon": -71.095722,
+   "distance_m": 4679.8,
+   "arrival_time": "04:55:00",
+   "stop_sequence": 16
+  },
+  {
+   "stop_id": "101",
+   "name": "Massachusetts Ave @ Sidney St",
+   "lat": 42.362988,
+   "lon": -71.099486,
+   "distance_m": 5076.2,
+   "arrival_time": "04:57:00",
+   "stop_sequence": 17
+  },
+  {
+   "stop_id": "102",
+   "name": "Massachusetts Ave @ Prospect St",
+   "lat": 42.365291,
+   "lon": -71.103404,
+   "distance_m": 5487.6,
+   "arrival_time": "04:59:00",
+   "stop_sequence": 18
+  },
+  {
+   "stop_id": "104",
+   "name": "Massachusetts Ave @ Inman St",
+   "lat": 42.366779,
+   "lon": -71.105813,
+   "distance_m": 5745.5,
+   "arrival_time": "05:00:00",
+   "stop_sequence": 19
+  },
+  {
+   "stop_id": "106",
+   "name": "Massachusetts Ave @ Hancock St",
+   "lat": 42.368562,
+   "lon": -71.108988,
+   "distance_m": 6073.2,
+   "arrival_time": "05:00:00",
+   "stop_sequence": 20
+  },
+  {
+   "stop_id": "107",
+   "name": "Massachusetts Ave @ Dana St",
+   "lat": 42.369265,
+   "lon": -71.110773,
+   "distance_m": 6239.3,
+   "arrival_time": "05:01:00",
+   "stop_sequence": 21
+  },
+  {
+   "stop_id": "108",
+   "name": "Massachusetts Ave @ Trowbridge St",
+   "lat": 42.37027,
+   "lon": -71.112998,
+   "distance_m": 6453.6,
+   "arrival_time": "05:01:00",
+   "stop_sequence": 22
+  },
+  {
+   "stop_id": "109",
+   "name": "Massachusetts Ave @ Bow St",
+   "lat": 42.372099,
+   "lon": -71.115371,
+   "distance_m": 6735.3,
+   "arrival_time": "05:02:00",
+   "stop_sequence": 23
+  },
+  {
+   "stop_id": "110",
+   "name": "Massachusetts Ave opp Holyoke St",
+   "lat": 42.373111,
+   "lon": -71.117653,
+   "distance_m": 6954.0,
+   "arrival_time": "05:03:00",
+   "stop_sequence": 24
+  }
+ ]
+}

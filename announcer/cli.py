@@ -75,6 +75,60 @@ def cmd_generate_samples(args) -> int:
     return 0
 
 
+def cmd_gtfs(args) -> int:
+    """Announce a REAL route from a GTFS feed (MBTA Boston by default)."""
+    from . import gtfs as G
+    from .scenario import Stop
+
+    if args.list:
+        for rid, short, long in G.list_routes(args.feed, route_type=args.route_type or None):
+            print(f"  {rid:<14} {short:<10} {long}")
+        return 0
+
+    info = G.get_route(args.route, str(args.direction), feed_path=args.feed,
+                       url=args.url, refresh=args.refresh)
+    stops = list(info.stops)
+    if args.max_stops and len(stops) > args.max_stops:
+        stops = stops[: args.max_stops]
+
+    # build scenario stops (GTFS names are English; reuse for both languages)
+    scenario_stops, last = [], -1.0
+    for s in stops:
+        d = max(float(s.distance_m), last + 1.0)
+        last = d
+        scenario_stops.append(Stop(s.name, s.name, int(d)))
+
+    scenario = BusScenario(seed=args.seed, stops=scenario_stops,
+                           line=f"Route {args.route}",
+                           destination_en=scenario_stops[-1].name_en,
+                           destination_zh=scenario_stops[-1].name_zh,
+                           dwell=args.dwell, speed_limit=args.speed_limit)
+
+    if not args.quiet:
+        print(f"[gtfs] route {info.route_id} · {info.route_name} "
+              f"({G.ROUTE_TYPE_NAMES.get(info.route_type, '?')})")
+        print(f"[gtfs] canonical trip {info.trip_id} headsign={info.headsign!r} "
+              f"· {len(info.stops)} stops in feed · using first {len(scenario_stops)}")
+        for i, s in enumerate(scenario_stops, 1):
+            print(f"   {i:>2}. {s.name_en:<44} @ {s.distance:>5} m")
+        print("-" * 62)
+
+    engine = create_engine(args.engine, lang=args.lang, voice=args.voice,
+                           quiet=args.quiet)
+    announcer = VoiceAnnouncer(engine, lang=args.lang, speedup=args.speedup,
+                               quiet=args.quiet or args.engine == "silent")
+    result = announcer.run_scenario(scenario, hold=args.hold)
+    if not args.quiet:
+        print("-" * 62)
+        print(f"gtfs route={args.route}  events={len(result.events)}  "
+              f"distance={result.total_distance/1000:.1f} km  "
+              f"duration={result.duration:.0f}s (sim)")
+    engine.close()
+    if args.hold:
+        input("Press Enter to exit...")
+    return 0
+
+
 def cmd_plot(args) -> int:
     scenario = _build_scenario(args.scenario, args.seed)
     result = scenario.run()
@@ -121,6 +175,27 @@ def main(argv=None) -> int:
     p_plot.add_argument("--seed", type=int, default=42)
     p_plot.add_argument("--out", default=os.path.join("docs", "trip-timeline.png"))
     p_plot.set_defaults(func=cmd_plot)
+
+    p_gtfs = sub.add_parser("gtfs", help="announce a real route from a GTFS feed (MBTA)")
+    p_gtfs.add_argument("--route", default="1", help="route_id in the feed (default: 1)")
+    p_gtfs.add_argument("--direction", type=int, choices=[0, 1], default=0)
+    p_gtfs.add_argument("--feed", default=os.path.join("data", "mbta_gtfs.zip"))
+    p_gtfs.add_argument("--url", default=None, help="alternative GTFS zip url")
+    p_gtfs.add_argument("--max-stops", type=int, default=12,
+                        help="announce only the first N stops of the real sequence")
+    p_gtfs.add_argument("--dwell", type=int, default=15, help="seconds dwelled at each stop")
+    p_gtfs.add_argument("--speed-limit", type=int, default=50)
+    p_gtfs.add_argument("--list", action="store_true", help="list routes and exit")
+    p_gtfs.add_argument("--route-type", default="3", help="filter for --list (3=bus)")
+    p_gtfs.add_argument("--refresh", action="store_true", help="ignore snapshot, re-parse feed")
+    p_gtfs.add_argument("--lang", choices=["zh", "en"], default="en")
+    p_gtfs.add_argument("--engine", choices=["auto", "indextts", "sapi", "silent"], default="auto")
+    p_gtfs.add_argument("--voice", default=None)
+    p_gtfs.add_argument("--speedup", type=float, default=15.0)
+    p_gtfs.add_argument("--seed", type=int, default=42)
+    p_gtfs.add_argument("--hold", type=float, default=0.0)
+    p_gtfs.add_argument("--quiet", action="store_true")
+    p_gtfs.set_defaults(func=cmd_gtfs)
 
     sub.add_parser("list-events", help="show event kinds, priorities and templates").set_defaults(
         func=cmd_list_events)

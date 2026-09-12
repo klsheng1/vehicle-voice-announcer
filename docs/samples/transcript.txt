@@ -1,0 +1,17 @@
+[00:05] INFO  departure    ANNOUNCE  车辆起步，请扶稳坐好。
+[00:20] NAV   next_stop    ANNOUNCE  下一站：东长安街。
+[00:44] NAV   red_light    ANNOUNCE  前方红灯，预计等待40秒，请耐心等候。
+[01:36] SAFE  sharp_turn   ANNOUNCE  前方急转弯，请减速慢行。
+[01:36] SAFE  speeding     QUEUED    当前车速超过限速，请减速行驶。
+[01:39] SAFE  school_zone  QUEUED    已进入学校区域，注意儿童，减速慢行。
+[01:36] SAFE  speeding     ANNOUNCE  当前车速超过限速，请减速行驶。  [deferred from queue]
+[01:39] SAFE  school_zone  ANNOUNCE  已进入学校区域，注意儿童，减速慢行。  [deferred from queue]
+[02:30] NAV   congestion   ANNOUNCE  前方路段拥堵，预计通行时间6分钟。
+[02:32] SAFE  blind_spot   PREEMPT   (cancels 'congestion': priority SAFETY > NAVIGATION) 注意，右后方有非机动车接近，请避让。
+[02:32] SAFE  blind_spot   ANNOUNCE  注意，右后方有非机动车接近，请避让。
+[03:30] SAFE  rain         ANNOUNCE  检测到降雨，请开启雨刮，保持安全车距。
+[03:36] NAV   next_stop    ANNOUNCE  下一站：人民广场。
+[03:44] NAV   next_stop    SUPPRESS  (cooldown group 'next_stop' fired 8s ago) 下一站：人民广场。
+[04:04] NAV   arriving     ANNOUNCE  前方到站：人民广场，请准备从后门下车。
+[04:18] NAV   arrival      ANNOUNCE  人民广场到了，请带好随身物品下车。
+[04:56] INFO  trip_end     ANNOUNCE  本次行程结束，感谢乘坐。

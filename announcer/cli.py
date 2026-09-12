@@ -1,208 +1,157 @@
-# -*- coding: utf-8 -*-
-"""Command-line entry points.
+"""Run the simulated drive and speak (or log) every announcement.
 
-Examples::
-
-    python -m announcer.cli simulate --scenario bus --engine auto --speedup 60
-    python -m announcer.cli simulate --scenario car --lang en --engine sapi
-    python -m announcer.cli generate-samples --outdir assets/audio
-    python -m announcer.cli plot --scenario bus --out docs/trip-timeline.png
+Examples:
+    python -m announcer.cli                          # auto backend, zh prompts
+    python -m announcer.cli --backend edge --lang en
+    python -m announcer.cli --no-audio               # decisions only, no TTS
 """
+
 from __future__ import annotations
 
 import argparse
 import os
 import sys
+from pathlib import Path
 
-from .announcer import VoiceAnnouncer
-from .events import EVENT_POLICIES
-from .scenario import BusScenario, CarScenario, plot_timeline
-from .tts import create_engine
+from .dispatcher import Dispatcher
+from .events import Event, Priority
+from .figures import drive_timeline, spectrogram
+from .prompts import render
+from .sim import build_drive
+from .tts import get_backend
 
+ACTION_STYLE = {
+    "ANNOUNCE": ("\033[32m", "ANNOUNCE"),
+    "PREEMPT": ("\033[1;31m", "PREEMPT"),
+    "SUPPRESS": ("\033[33m", "SUPPRESS"),
+    "QUEUED": ("\033[36m", "QUEUED"),
+}
+RESET = "\033[0m"
+EXT_BY_BACKEND = {"edge": ".mp3", "sapi": ".wav", "index-tts": ".wav"}
 
-def _build_scenario(name: str, seed):
-    cls = BusScenario if name == "bus" else CarScenario
-    return cls(seed=seed)
-
-
-def cmd_simulate(args) -> int:
-    scenario = _build_scenario(args.scenario, args.seed)
-    engine = create_engine(args.engine, lang=args.lang, voice=args.voice,
-                           quiet=args.quiet)
-    announcer = VoiceAnnouncer(engine, lang=args.lang, speedup=args.speedup,
-                               quiet=args.quiet)
-    result = announcer.run_scenario(scenario, hold=args.hold)
-    if not args.quiet:
-        print("-" * 62)
-        print(f"scenario={args.scenario}  events={len(result.events)}  "
-              f"distance={result.total_distance/1000:.1f} km  "
-              f"duration={result.duration:.0f}s (sim)")
-    engine.close()
-    if args.hold:
-        input("Press Enter to exit...")
-    return 0
+PRIORITY_TAG = {Priority.INFO: "INFO ", Priority.NAVIGATION: "NAV  ",
+                Priority.SAFETY: "SAFE "}
 
 
-def cmd_generate_samples(args) -> int:
-    """Render one wav per event kind — committed to assets/audio for the README."""
-    from .events import TEMPLATES
-    engine = create_engine(args.engine, lang=args.lang, voice=args.voice,
-                           quiet=args.quiet)
-    os.makedirs(args.outdir, exist_ok=True)
-    order = ["departure", "next_stop_600m", "arriving", "turn_left",
-             "overspeed", "harsh_brake", "congestion", "fatigue", "trip_summary"]
-    params = {
-        "line": "Demo Line 1", "destination": "Tech Park", "destination_zh": "科技园站",
-        "stop": "People's Square", "stop_zh": "人民广场",
-        "speed": 62, "limit": 50, "delay": 8, "minutes": 14, "distance": 8.6,
-    }
-    index = 0
-    for kind in order:
-        if kind not in TEMPLATES:
-            continue
-        index += 1
-        text = TEMPLATES[kind][args.lang]
-        try:
-            text = text.format(**params)
-        except KeyError:
-            pass
-        name = f"{index:02d}_{kind.lower()}.wav"
-        path = os.path.join(args.outdir, name)
-        engine.synthesize_to_file(text, path)
-        print(f"  {name}  <-  {text}")
-    engine.close()
-    print(f"done: {index} audio files in {args.outdir}")
-    return 0
+def _clock(t: float) -> str:
+    return f"{int(t) // 60:02d}:{int(t) % 60:02d}"
 
 
-def cmd_gtfs(args) -> int:
-    """Announce a REAL route from a GTFS feed (MBTA Boston by default)."""
-    from . import gtfs as G
-    from .scenario import Stop
-
-    if args.list:
-        for rid, short, long in G.list_routes(args.feed, route_type=args.route_type or None):
-            print(f"  {rid:<14} {short:<10} {long}")
-        return 0
-
-    info = G.get_route(args.route, str(args.direction), feed_path=args.feed,
-                       url=args.url, refresh=args.refresh)
-    stops = list(info.stops)
-    if args.max_stops and len(stops) > args.max_stops:
-        stops = stops[: args.max_stops]
-
-    # build scenario stops (GTFS names are English; reuse for both languages)
-    scenario_stops, last = [], -1.0
-    for s in stops:
-        d = max(float(s.distance_m), last + 1.0)
-        last = d
-        scenario_stops.append(Stop(s.name, s.name, int(d)))
-
-    scenario = BusScenario(seed=args.seed, stops=scenario_stops,
-                           line=f"Route {args.route}",
-                           destination_en=scenario_stops[-1].name_en,
-                           destination_zh=scenario_stops[-1].name_zh,
-                           dwell=args.dwell, speed_limit=args.speed_limit)
-
-    if not args.quiet:
-        print(f"[gtfs] route {info.route_id} · {info.route_name} "
-              f"({G.ROUTE_TYPE_NAMES.get(info.route_type, '?')})")
-        print(f"[gtfs] canonical trip {info.trip_id} headsign={info.headsign!r} "
-              f"· {len(info.stops)} stops in feed · using first {len(scenario_stops)}")
-        for i, s in enumerate(scenario_stops, 1):
-            print(f"   {i:>2}. {s.name_en:<44} @ {s.distance:>5} m")
-        print("-" * 62)
-
-    engine = create_engine(args.engine, lang=args.lang, voice=args.voice,
-                           quiet=args.quiet)
-    announcer = VoiceAnnouncer(engine, lang=args.lang, speedup=args.speedup,
-                               quiet=args.quiet or args.engine == "silent")
-    result = announcer.run_scenario(scenario, hold=args.hold)
-    if not args.quiet:
-        print("-" * 62)
-        print(f"gtfs route={args.route}  events={len(result.events)}  "
-              f"distance={result.total_distance/1000:.1f} km  "
-              f"duration={result.duration:.0f}s (sim)")
-    engine.close()
-    if args.hold:
-        input("Press Enter to exit...")
-    return 0
+def _est_duration(text: str) -> float:
+    """Rough spoken length (s): Mandarin chars ~4.5/s, latin ~14/s."""
+    cjk = sum(1 for ch in text if ord(ch) > 0x2E80)
+    return 1.2 + cjk / 4.5 + (len(text) - cjk) / 14.0
 
 
-def cmd_plot(args) -> int:
-    scenario = _build_scenario(args.scenario, args.seed)
-    result = scenario.run()
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
-    out = plot_timeline(result, args.out)
-    print(f"timeline written to {out}")
-    return 0
+def run(backend_choice: str = "auto", lang: str = "zh", voice: str | None = None,
+        outdir: Path = Path("output"), figdir: Path | None = None,
+        cooldown_s: float = 20.0, no_audio: bool = False) -> list[dict]:
+    if os.name == "nt":
+        os.system("")  # enable ANSI escape codes on Windows terminals
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    backend = None
+    ext = ".wav"
+    if not no_audio:
+        backend = get_backend(backend_choice, cache_dir=outdir / ".tts_cache", voice=voice)
+        ext = EXT_BY_BACKEND.get(backend.name, ".wav")
+        print(f"TTS backend: {backend.name}")
+
+    events, t, speed, limit = build_drive()
+    dispatcher = Dispatcher(cooldown_s=cooldown_s)
+    transcript: list[str] = []
+    announced: list[dict] = []
+    current_finish = -1.0
+    file_idx = 1
+
+    def speak(event: Event, deferred: bool = False) -> None:
+        nonlocal file_idx, current_finish
+        text = render(event, lang)
+        suffix = "  [deferred from queue]" if deferred else ""
+        line = (f"[{_clock(event.t_sim)}] {PRIORITY_TAG[event.priority]} "
+                f"{event.kind:<12} ANNOUNCE  {text}{suffix}")
+        transcript.append(line)
+        color = ACTION_STYLE["ANNOUNCE"][0]
+        print(f"{color}{line}{RESET}")
+        audio_path = None
+        if backend is not None:
+            audio_path = outdir / f"{file_idx:02d}_{event.kind}{ext}"
+            backend.synth(text, audio_path)
+            file_idx += 1
+        announced.append({"event": event, "text": text, "file": audio_path})
+        current_finish = event.t_sim + _est_duration(text)
+
+    def log_decision(d) -> None:
+        text = render(d.event, lang)
+        tag = PRIORITY_TAG[d.event.priority]
+        if d.action == "suppress":
+            line = (f"[{_clock(d.event.t_sim)}] {tag} {d.event.kind:<12} "
+                    f"SUPPRESS  ({d.reason}) {text}")
+            color = ACTION_STYLE["SUPPRESS"][0]
+        elif d.action == "preempt":
+            line = (f"[{_clock(d.event.t_sim)}] {tag} {d.event.kind:<12} "
+                    f"PREEMPT   (cancels {d.displaced.kind!r}: {d.reason}) {text}")
+            color = ACTION_STYLE["PREEMPT"][0]
+        else:
+            line = (f"[{_clock(d.event.t_sim)}] {tag} {d.event.kind:<12} "
+                    f"QUEUED    {text}")
+            color = ACTION_STYLE["QUEUED"][0]
+        transcript.append(line)
+        print(f"{color}{line}{RESET}")
+
+    for event in events:
+        # Let queued messages start once the current one would have finished.
+        while current_finish >= 0 and event.t_sim >= current_finish:
+            nxt = dispatcher.finish_current()
+            if nxt is None:
+                current_finish = -1.0
+                break
+            speak(nxt, deferred=True)
+        decision = dispatcher.submit(event)
+        if decision.action == "announce" or decision.action == "preempt":
+            if decision.action == "preempt":
+                log_decision(decision)
+                current_finish = -1.0
+            speak(decision.event)
+        else:
+            log_decision(decision)
+
+    (outdir / "transcript.txt").write_text("\n".join(transcript) + "\n",
+                                           encoding="utf-8")
+    print(f"\nTranscript written to {outdir / 'transcript.txt'}")
+
+    if figdir is not None:
+        timeline = drive_timeline(t, speed, limit, announced,
+                                  Path(figdir) / "drive_timeline.png")
+        print(f"Timeline figure -> {timeline}")
+        first_audio = next((a["file"] for a in announced if a["file"]), None)
+        if first_audio is not None:
+            spec = spectrogram(first_audio, Path(figdir) / "spectrogram.png")
+            print(f"Spectrogram -> {spec}")
+    return announced
 
 
-def cmd_list_events(_args) -> int:
-    for kind, policy in EVENT_POLICIES.items():
-        zh = __import__("announcer.events", fromlist=["TEMPLATES"]).TEMPLATES[kind]["zh"]
-        print(f"{kind:<15} priority={policy['priority'].name:<9} cooldown={policy['cooldown']:>3}s   {zh}")
-    return 0
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--backend", default="auto",
+                        choices=["auto", "index-tts", "edge", "sapi"])
+    parser.add_argument("--lang", default="zh", choices=["zh", "en"])
+    parser.add_argument("--voice", help="edge-tts voice name or IndexTTS speaker wav")
+    parser.add_argument("--outdir", type=Path, default=Path("output"))
+    parser.add_argument("--figdir", type=Path, default=Path("docs/images"),
+                        help="write timeline/spectrogram figures here (skip: --no-figure)")
+    parser.add_argument("--no-figure", action="store_true")
+    parser.add_argument("--no-audio", action="store_true",
+                        help="log decisions only; skip TTS entirely")
+    parser.add_argument("--cooldown", type=float, default=20.0,
+                        help="dispatcher cooldown seconds (default 20)")
+    args = parser.parse_args()
 
-
-def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(prog="announcer", description=__doc__)
-    sub = parser.add_subparsers(dest="cmd", required=True)
-
-    p_sim = sub.add_parser("simulate", help="run a traffic scenario with voice announcements")
-    p_sim.add_argument("--scenario", choices=["bus", "car"], default="bus")
-    p_sim.add_argument("--lang", choices=["zh", "en"], default="zh")
-    p_sim.add_argument("--engine", choices=["auto", "indextts", "sapi", "silent"], default="auto")
-    p_sim.add_argument("--voice", default=None, help="voice hint / IndexTTS reference wav")
-    p_sim.add_argument("--speedup", type=float, default=30.0,
-                       help="simulate N sim-seconds per wall second (default 30)")
-    p_sim.add_argument("--seed", type=int, default=42)
-    p_sim.add_argument("--hold", type=float, default=0.0,
-                       help="extra seconds to keep playing after the last event")
-    p_sim.add_argument("--quiet", action="store_true")
-    p_sim.set_defaults(func=cmd_simulate)
-
-    p_gen = sub.add_parser("generate-samples", help="render announcement samples to wav files")
-    p_gen.add_argument("--lang", choices=["zh", "en"], default="zh")
-    p_gen.add_argument("--engine", choices=["auto", "indextts", "sapi", "silent"], default="sapi")
-    p_gen.add_argument("--voice", default=None)
-    p_gen.add_argument("--outdir", default=os.path.join("assets", "audio"))
-    p_gen.add_argument("--quiet", action="store_true")
-    p_gen.set_defaults(func=cmd_generate_samples)
-
-    p_plot = sub.add_parser("plot", help="render the speed profile with event markers")
-    p_plot.add_argument("--scenario", choices=["bus", "car"], default="bus")
-    p_plot.add_argument("--seed", type=int, default=42)
-    p_plot.add_argument("--out", default=os.path.join("docs", "trip-timeline.png"))
-    p_plot.set_defaults(func=cmd_plot)
-
-    p_gtfs = sub.add_parser("gtfs", help="announce a real route from a GTFS feed (MBTA)")
-    p_gtfs.add_argument("--route", default="1", help="route_id in the feed (default: 1)")
-    p_gtfs.add_argument("--direction", type=int, choices=[0, 1], default=0)
-    p_gtfs.add_argument("--feed", default=os.path.join("data", "mbta_gtfs.zip"))
-    p_gtfs.add_argument("--url", default=None, help="alternative GTFS zip url")
-    p_gtfs.add_argument("--max-stops", type=int, default=12,
-                        help="announce only the first N stops of the real sequence")
-    p_gtfs.add_argument("--dwell", type=int, default=15, help="seconds dwelled at each stop")
-    p_gtfs.add_argument("--speed-limit", type=int, default=50)
-    p_gtfs.add_argument("--list", action="store_true", help="list routes and exit")
-    p_gtfs.add_argument("--route-type", default="3", help="filter for --list (3=bus)")
-    p_gtfs.add_argument("--refresh", action="store_true", help="ignore snapshot, re-parse feed")
-    p_gtfs.add_argument("--lang", choices=["zh", "en"], default="en")
-    p_gtfs.add_argument("--engine", choices=["auto", "indextts", "sapi", "silent"], default="auto")
-    p_gtfs.add_argument("--voice", default=None)
-    p_gtfs.add_argument("--speedup", type=float, default=15.0)
-    p_gtfs.add_argument("--seed", type=int, default=42)
-    p_gtfs.add_argument("--hold", type=float, default=0.0)
-    p_gtfs.add_argument("--quiet", action="store_true")
-    p_gtfs.set_defaults(func=cmd_gtfs)
-
-    sub.add_parser("list-events", help="show event kinds, priorities and templates").set_defaults(
-        func=cmd_list_events)
-
-    args = parser.parse_args(argv)
-    return args.func(args)
+    run(backend_choice=args.backend, lang=args.lang, voice=args.voice,
+        outdir=args.outdir, figdir=None if args.no_figure else args.figdir,
+        cooldown_s=args.cooldown, no_audio=args.no_audio)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

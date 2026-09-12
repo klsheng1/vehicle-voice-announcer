@@ -1,34 +1,37 @@
-# -*- coding: utf-8 -*-
-"""Abstract TTS engine interface shared by all backends."""
+"""TTS backend interface + shared caching."""
+
 from __future__ import annotations
 
-import abc
+import hashlib
+from abc import ABC, abstractmethod
+from pathlib import Path
 
 
-class EngineUnavailable(RuntimeError):
-    """Raised when a TTS backend cannot be initialised (missing deps/models)."""
+class TTSBackend(ABC):
+    """A backend turns one announcement into an audio file.
 
-
-class BaseEngine(abc.ABC):
-    """Minimal contract required by :class:`announcer.announcer.VoiceAnnouncer`."""
+    Subclasses must set ``name`` and implement :meth:`_synth`. Results are
+    cached by (backend, voice, text) so repeated prompts are free.
+    """
 
     name: str = "base"
 
-    def __init__(self, lang: str = "zh", voice: str | None = None):
-        self.lang = lang
-        self.voice = voice
+    def __init__(self, cache_dir: Path):
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    @abc.abstractmethod
-    def speak(self, text: str) -> None:
-        """Speak ``text`` aloud (blocking)."""
+    def synth(self, text: str, out_path: Path, voice: str | None = None) -> Path:
+        digest = hashlib.sha1(f"{self.name}|{voice}|{text}".encode()).hexdigest()[:12]
+        cached = self.cache_dir / f"{digest}{out_path.suffix}"
+        if cached.exists():
+            return cached
+        result = self._synth(text, Path(out_path), voice)
+        return result if result is not None else Path(out_path)
 
-    @abc.abstractmethod
-    def stop(self) -> None:
-        """Abort current playback as soon as possible (best effort)."""
+    @abstractmethod
+    def _synth(self, text: str, out_path: Path, voice: str | None) -> Path | None:
+        ...
 
-    @abc.abstractmethod
-    def synthesize_to_file(self, text: str, path: str) -> str:
-        """Render ``text`` to an audio file and return the path."""
-
-    def close(self) -> None:  # noqa: B027 - optional hook
-        """Release resources. Default: nothing to do."""
+    @abstractmethod
+    def available(self) -> bool:
+        ...

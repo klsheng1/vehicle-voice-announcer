@@ -1,11 +1,16 @@
+# Generated audio & caches (regenerate with `python -m announcer.cli`)
+output/
+
+# Python
 __pycache__/
 *.py[cod]
-checkpoints/
-data/*.zip
-assets/voices/*.wav
-docs/_drafts/
-.ipynb_checkpoints/
 *.egg-info/
 .venv/
 venv/
+.pytest_cache/
+
+# OS / editor
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/
